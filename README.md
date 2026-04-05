@@ -17,7 +17,7 @@
 ---
 
 ## Önemli Not!
- .apk Dosyasını indirirken **Google Play Store** sizi uyaracaktır. Bu durum tamamiyle uygulamanın lisanssız olmasından kaynaklıdır. Gönül rahatlığı ile kurabilirisiniz.
+ `PersonalLib.apk` Dosyasını kurarken **Google Play Store** sizi uyaracaktır. Bu durum tamamiyle uygulamanın lisanssız olmasından kaynaklıdır. Gönül rahatlığı ile kurabilirisiniz.
 
 ---
 
