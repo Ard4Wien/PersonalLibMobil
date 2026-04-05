@@ -2,20 +2,14 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StatusPicker } from '@/components/ui/StatusPicker';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
-import { MediaStatus } from '@/lib/types';
+import { MediaStatus, UpdateMovie } from '@/lib/types';
 import { validateMedia } from '@/lib/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-
-const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
-    { label: 'İstek Listesi', value: 'WISHLIST' },
-    { label: 'İzleniyor', value: 'WATCHING' },
-    { label: 'Tamamlandı', value: 'COMPLETED' },
-    { label: 'Bırakıldı', value: 'DROPPED' },
-];
 
 export default function EditMovieModal() {
     const params = useLocalSearchParams();
@@ -23,6 +17,14 @@ export default function EditMovieModal() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
+
+    const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
+        { label: t('filterWishlist'), value: 'WISHLIST' },
+        { label: t('statusWatching'), value: 'WATCHING' },
+        { label: t('statusCompleted'), value: 'COMPLETED' },
+        { label: t('filterDropped'), value: 'DROPPED' },
+    ];
 
     const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -40,39 +42,32 @@ export default function EditMovieModal() {
         status: 'WATCHING' as MediaStatus,
         releaseYear: '',
         duration: '',
+        movieId: '',
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (movies && id && !dataLoaded) {
-            console.log('=== EDIT MOVIE DEBUG ===');
-            console.log('Received ID:', id);
-
-            let foundMovie = movies.find(m => m.id === id);
-            if (!foundMovie) {
-                foundMovie = movies.find(m => String(m.id) === String(id));
-            }
-
-            console.log('Found movie:', foundMovie);
+            let foundMovie = movies.find(m => String(m.id) === String(id)) ||
+                movies.find(m => (m as any)._id === id);
 
             if (foundMovie) {
-                // Handle nested movie data structure
                 const movieData = (foundMovie as any).movie || foundMovie;
                 const userStatus = (foundMovie as any).overallStatus || foundMovie.status || 'WATCHING';
-                const refId = (foundMovie as any).movieId || movieData.id;
-
-                console.log('[EditMovie] Using movie data:', JSON.stringify(movieData).substring(0, 100));
+                const refId = (foundMovie as any).movieId || movieData.id || (movieData as any)._id;
 
                 setFormData({
-                    ...formData,
                     title: movieData.title || (movieData as any).name || '',
                     director: movieData.director || (movieData as any).yonetmen || '',
                     coverImage: movieData.coverImage || (movieData as any).image || (movieData as any).imageUrl || '',
                     genre: movieData.genre || (movieData as any).category || '',
                     status: userStatus as MediaStatus,
-                    movieId: refId
-                } as any);
+                    movieId: refId || '',
+                    description: movieData.description || (movieData as any).summary || (movieData as any).aciklama || '',
+                    releaseYear: movieData.releaseYear?.toString() || '',
+                    duration: movieData.duration?.toString() || '',
+                });
                 setDataLoaded(true);
             }
         }
@@ -80,36 +75,27 @@ export default function EditMovieModal() {
 
     const mutation = useMutation({
         mutationFn: async (data: any) => {
-            console.log('[EditMovie] Update API broken, falling back to DELETE + CREATE strategy...');
+            if (!formData.movieId) {
+                throw new Error('Movie ID eksik.');
+            }
 
-            // 1. Delete existing record
-            await api.movies.delete(id);
-
-            // 2. Create new record
-            const createData: any = {
+            const updateData: UpdateMovie = {
+                id: id,
+                movieId: formData.movieId,
                 title: formData.title,
-                name: formData.title,
-
                 director: formData.director,
-                directorName: formData.director,
-
                 coverImage: formData.coverImage,
-                imageUrl: formData.coverImage,
-                image: formData.coverImage,
-
                 genre: formData.genre,
-                category: formData.genre,
-
                 status: formData.status,
             };
-            return await api.movies.create(createData);
+            return await api.movies.updateDetails(updateData);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['movies'] });
-            showToast('Film başarıyla güncellendi', 'success');
+            showToast(t('movieUpdated'), 'success');
             router.back();
         },
-        onError: (e: any) => showToast(e.message || 'Film güncellenemedi', 'error'),
+        onError: (e: any) => showToast(e.message || t('movieUpdateError'), 'error'),
     });
 
     const handleSubmit = () => {
@@ -117,7 +103,7 @@ export default function EditMovieModal() {
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            showToast('Lütfen zorunlu alanları doldurun', 'error');
+            showToast(t('fillRequired'), 'error');
             return;
         }
 
@@ -129,7 +115,7 @@ export default function EditMovieModal() {
         return (
             <View className="flex-1 bg-background items-center justify-center">
                 <ActivityIndicator size="large" color="#a855f7" />
-                <Text className="text-white mt-4">Yükleniyor...</Text>
+                <Text className="text-text-primary mt-4 font-medium">{t('loading')}</Text>
             </View>
         );
     }
@@ -137,17 +123,20 @@ export default function EditMovieModal() {
     if (!id) {
         return (
             <View className="flex-1 bg-background items-center justify-center">
-                <Text className="text-red-500">Hata: ID bulunamadı</Text>
+                <Text className="text-red-500">{t('errorIdNotFound')}</Text>
             </View>
         );
     }
 
     return (
-        <ScrollView className="flex-1 bg-background px-6 pt-6">
-            <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl mb-12">
+        <ScrollView
+            className="flex-1 bg-background"
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 40 }}
+        >
+            <View className="bg-background border border-border p-6 rounded-3xl mb-12 shadow-sm">
                 <Input
-                    label="Film Adı *"
-                    placeholder="Örn: Inception"
+                    label={t('movieName')}
+                    placeholder={t('placeholderMovieName')}
                     value={formData.title}
                     error={errors.title}
                     onChangeText={(text: string) => {
@@ -156,21 +145,21 @@ export default function EditMovieModal() {
                     }}
                 />
                 <Input
-                    label="Yönetmen"
-                    placeholder="Örn: Christopher Nolan"
+                    label={t('director')}
+                    placeholder={t('placeholderDirector')}
                     value={formData.director}
                     onChangeText={(text: string) => setFormData(p => ({ ...p, director: text }))}
                 />
 
                 <Input
-                    label="Tür"
-                    placeholder="Örn: Bilim Kurgu, Dram"
+                    label={t('genre')}
+                    placeholder={t('placeholderGenreMovie')}
                     value={formData.genre}
                     onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
                 />
 
                 <StatusPicker
-                    label="İzleme Durumu"
+                    label={t('status')}
                     options={STATUS_OPTIONS}
                     value={formData.status}
                     onChange={(status) => setFormData(p => ({ ...p, status }))}
@@ -178,15 +167,19 @@ export default function EditMovieModal() {
                 />
 
                 <Input
-                    label="Kapak Resmi URL"
-                    placeholder="https://..."
+                    label={t('imageUrl')}
+                    placeholder={t('placeholderUrl')}
                     value={formData.coverImage}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, coverImage: text }))}
+                    error={errors.coverImage}
+                    onChangeText={(text: string) => {
+                        setFormData(p => ({ ...p, coverImage: text }));
+                        if (errors.coverImage) setErrors(p => ({ ...p, coverImage: '' }));
+                    }}
                 />
 
 
                 <Button
-                    title="Değişiklikleri Kaydet"
+                    title={t('saveChanges')}
                     onPress={handleSubmit}
                     loading={mutation.isPending}
                     className="mt-4"

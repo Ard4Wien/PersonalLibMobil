@@ -1,41 +1,44 @@
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { SearchField } from '@/components/ui/SearchField';
 import { StatusPicker } from '@/components/ui/StatusPicker';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { MediaStatus } from '@/lib/types';
 import { validateMedia } from '@/lib/validation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-
-const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
-    { label: 'İstek Listesi', value: 'WISHLIST' },
-    { label: 'İzleniyor', value: 'WATCHING' },
-    { label: 'İzlendi', value: 'COMPLETED' },
-    { label: 'Bırakıldı', value: 'DROPPED' },
-];
+import { ChevronUp } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 
 export default function AddSeriesModal() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
+
+    const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
+        { label: t('filterWishlist'), value: 'WISHLIST' },
+        { label: t('statusWatching'), value: 'WATCHING' },
+        { label: t('statusCompleted'), value: 'COMPLETED' },
+        { label: t('filterDropped'), value: 'DROPPED' },
+    ];
 
     const [formData, setFormData] = useState({
         title: '',
         creator: '',
         coverImage: '',
+        description: '',
         genre: '',
         totalSeasons: '',
+        lastSeason: '',
+        lastEpisode: '',
         startYear: '',
         endYear: '',
         status: 'WATCHING' as MediaStatus,
     });
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -43,47 +46,25 @@ export default function AddSeriesModal() {
         mutationFn: api.series.create,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['series'] });
-            showToast('Dizi başarıyla eklendi', 'success');
+            showToast(t('seriesAdded'), 'success');
             router.back();
         },
-        onError: (e: any) => showToast(e.message || 'Dizi eklenemedi', 'error'),
+        onError: (e: any) => showToast(e.message || t('seriesError'), 'error'),
     });
-
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (searchQuery.length > 2) {
-                handleSearch();
-            } else {
-                setSearchResults([]);
-            }
-        }, 500);
-
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery]);
-
-    const handleSearch = async () => {
-        setIsSearching(true);
-        try {
-            const results = await api.search.series(searchQuery);
-            setSearchResults(results.filter(s => s.coverImage || (s as any).imageUrl || (s as any).image));
-        } catch (err) {
-            console.error('Search error:', err);
-        } finally {
-            setIsSearching(false);
-        }
-    };
 
     const selectResult = (item: any) => {
         setFormData(prev => ({
             ...prev,
-            title: item.title || item.name || '',
-            creator: item.creator || item.creatorName || item.yapimci || '',
-            coverImage: item.coverImage || item.imageUrl || item.image || '',
+            title: item.title || item.name || item.baslik || '',
+            creator: item.creator || item.yapimci || item.writer || '',
+            coverImage: item.coverImage || item.imageUrl || item.image || item.cover_image || item.image_url || '',
+            description: item.description || item.summary || item.aciklama || '',
             genre: item.genre || item.category || '',
-            status: 'WISHLIST',
+            totalSeasons: item.totalSeasons?.toString() || '',
+            startYear: item.startYear?.toString() || '',
+            endYear: item.endYear?.toString() || '',
+            status: 'WATCHING' as MediaStatus,
         }));
-        setSearchResults([]);
-        setSearchQuery('');
     };
 
     const handleSubmit = () => {
@@ -91,115 +72,140 @@ export default function AddSeriesModal() {
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            showToast('Lütfen zorunlu alanları doldurun', 'error');
+            showToast(t('fillRequired'), 'error');
             return;
         }
 
         setErrors({});
-        const data = {
+        const payload = {
             ...formData,
             totalSeasons: formData.totalSeasons ? parseInt(formData.totalSeasons) : undefined,
+            lastSeason: formData.lastSeason ? parseInt(formData.lastSeason) : undefined,
+            lastEpisode: formData.lastEpisode ? parseInt(formData.lastEpisode) : undefined,
             startYear: formData.startYear ? parseInt(formData.startYear) : undefined,
             endYear: formData.endYear ? parseInt(formData.endYear) : undefined,
         };
-        mutation.mutate(data as any);
+        mutation.mutate(payload as any);
+    };
+
+    const handleIncrement = (field: 'lastSeason' | 'lastEpisode') => {
+        const current = parseInt(formData[field]) || 0;
+        setFormData(p => ({ ...p, [field]: (current + 1).toString() }));
     };
 
     return (
-        <ScrollView className="flex-1 bg-background px-6 pt-6">
-            <View className="mb-6">
-                <View className="relative">
+        <View className="flex-1 bg-background pt-28">
+            <View className="px-6 z-50">
+                <SearchField
+                    placeholder={t('searchPlaceholderSeries')}
+                    onSelect={selectResult}
+                    searchFn={api.search.series}
+                    getSubtitle={(item) => item.creator || item.yapimci || item.creatorName || t('noCreator')}
+                    iconColor="#06b6d4"
+                />
+            </View>
+
+            <ScrollView className="flex-1 px-6 pt-2 mb-12" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+                <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                     <Input
-                        placeholder="Dizi ara ve ekle..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        className="pr-12"
+                        label={t('seriesName')}
+                        placeholder={t('placeholderSeriesName')}
+                        value={formData.title}
+                        error={errors.title}
+                        onChangeText={(text: string) => {
+                            setFormData(p => ({ ...p, title: text }));
+                            if (errors.title) setErrors(p => ({ ...p, title: '' }));
+                        }}
                     />
-                    <View className="absolute right-4 top-1/2 -mt-2">
-                        {isSearching ? <ActivityIndicator size="small" color="#9333ea" /> : <Search size={20} color="#64748b" />}
+                    <Input
+                        label={t('creator')}
+                        placeholder={t('placeholderCreator')}
+                        value={formData.creator}
+                        onChangeText={(text: string) => setFormData(p => ({ ...p, creator: text }))}
+                    />
+
+                    <View className="flex-row space-x-3">
+                        <Input
+                            label={t('totalSeasons')}
+                            placeholder={t('placeholderUrl')}
+                            value={formData.totalSeasons}
+                            keyboardType="numeric"
+                            containerStyle="flex-1"
+                            onChangeText={(text: string) => setFormData(p => ({ ...p, totalSeasons: text }))}
+                        />
+                        <Input
+                            label={t('genre')}
+                            placeholder={t('placeholderGenreSeries')}
+                            value={formData.genre}
+                            containerStyle="flex-1"
+                            onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
+                        />
                     </View>
+
+                    <StatusPicker
+                        label={t('status')}
+                        options={STATUS_OPTIONS}
+                        value={formData.status}
+                        onChange={(status) => setFormData(p => ({ ...p, status }))}
+                        color="blue"
+                    />
+
+                    {formData.status === 'WATCHING' && (
+                        <View className="flex-row space-x-3 mt-2">
+                            <Input
+                                label={t('lastSeason')}
+                                placeholder="0"
+                                value={formData.lastSeason}
+                                keyboardType="numeric"
+                                containerStyle="flex-1"
+                                onChangeText={(text: string) => setFormData(p => ({ ...p, lastSeason: text }))}
+                                rightElement={
+                                    <TouchableOpacity
+                                        onPress={() => handleIncrement('lastSeason')}
+                                        className="bg-slate-800 p-2 rounded-lg active:bg-slate-700"
+                                    >
+                                        <ChevronUp size={16} color="#06b6d4" />
+                                    </TouchableOpacity>
+                                }
+                            />
+                            <Input
+                                label={t('lastEpisode')}
+                                placeholder="0"
+                                value={formData.lastEpisode}
+                                keyboardType="numeric"
+                                containerStyle="flex-1"
+                                onChangeText={(text: string) => setFormData(p => ({ ...p, lastEpisode: text }))}
+                                rightElement={
+                                    <TouchableOpacity
+                                        onPress={() => handleIncrement('lastEpisode')}
+                                        className="bg-slate-800 p-2 rounded-lg active:bg-slate-700"
+                                    >
+                                        <ChevronUp size={16} color="#06b6d4" />
+                                    </TouchableOpacity>
+                                }
+                            />
+                        </View>
+                    )}
+
+                    <Input
+                        label={t('imageUrl')}
+                        placeholder={t('placeholderUrl')}
+                        value={formData.coverImage}
+                        error={errors.coverImage}
+                        onChangeText={(text: string) => {
+                            setFormData(p => ({ ...p, coverImage: text }));
+                            if (errors.coverImage) setErrors(p => ({ ...p, coverImage: '' }));
+                        }}
+                    />
+
+                    <Button
+                        title={t('save')}
+                        onPress={handleSubmit}
+                        loading={mutation.isPending}
+                        className="mt-4"
+                    />
                 </View>
-
-                {searchResults.length > 0 && (
-                    <View className="bg-slate-900 border border-slate-800 rounded-2xl mt-2 overflow-hidden shadow-2xl">
-                        {searchResults.slice(0, 5).map((item, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                onPress={() => selectResult(item)}
-                                className="flex-row items-center p-3 border-b border-slate-800 active:bg-slate-800"
-                            >
-                                <Image
-                                    source={{ uri: api.utils.optimizeImage(item.coverImage || item.imageUrl || item.image) }}
-                                    className="w-10 h-14 rounded-md bg-slate-800"
-                                />
-                                <View className="ml-3 flex-1">
-                                    <Text className="text-white font-bold text-sm" numberOfLines={1}>{item.title || item.name}</Text>
-                                    <Text className="text-slate-400 text-xs" numberOfLines={1}>{item.creator || item.creatorName || item.yapimci || 'Yapımcı Belirtilmemiş'}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-            </View>
-
-            <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl mb-12">
-                <Input
-                    label="Dizi Adı *"
-                    placeholder="Örn: Breaking Bad"
-                    value={formData.title}
-                    error={errors.title}
-                    onChangeText={(text: string) => {
-                        setFormData(p => ({ ...p, title: text }));
-                        if (errors.title) setErrors(p => ({ ...p, title: '' }));
-                    }}
-                />
-                <Input
-                    label="Yapımcı/Yaratıcı *"
-                    placeholder="Örn: Vince Gilligan"
-                    value={formData.creator}
-                    error={errors.creator}
-                    onChangeText={(text: string) => {
-                        setFormData(p => ({ ...p, creator: text }));
-                        if (errors.creator) setErrors(p => ({ ...p, creator: '' }));
-                    }}
-                />
-                <Input
-                    label="Tür"
-                    placeholder="Örn: Dram, Gerilim, Suç"
-                    value={formData.genre}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
-                />
-
-                <StatusPicker
-                    label="İzleme Durumu"
-                    options={STATUS_OPTIONS}
-                    value={formData.status}
-                    onChange={(status) => setFormData(p => ({ ...p, status }))}
-                    color="cyan"
-                />
-
-                <Input
-                    label="Toplam Sezon"
-                    placeholder="Örn: 5"
-                    value={formData.totalSeasons}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, totalSeasons: text }))}
-                    keyboardType="numeric"
-                />
-
-                <Input
-                    label="Kapak Resmi URL"
-                    placeholder="https://..."
-                    value={formData.coverImage}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, coverImage: text }))}
-                />
-
-                <Button
-                    title="Diziyi Kaydet"
-                    onPress={handleSubmit}
-                    loading={mutation.isPending}
-                    className="mt-4"
-                />
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 }

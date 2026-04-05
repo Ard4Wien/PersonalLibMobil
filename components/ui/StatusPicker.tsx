@@ -13,6 +13,7 @@ interface StatusPickerProps {
     onChange: (value: MediaStatus) => void;
     color?: 'purple' | 'blue' | 'cyan';
     label?: string;
+    containerStyle?: string;
 }
 
 const COLORS = {
@@ -21,11 +22,11 @@ const COLORS = {
     cyan: { bg: '#0891b2', border: '#06b6d4' },
 };
 
-export const StatusPicker = ({ options, value, onChange, color = 'purple', label }: StatusPickerProps) => {
+export const StatusPicker = ({ options, value, onChange, color = 'purple', label, containerStyle }: StatusPickerProps) => {
     const activeColor = COLORS[color];
 
     return (
-        <View style={styles.container}>
+        <View className={`mb-6 ${containerStyle || ''}`}>
             {label && <Text style={styles.label}>{label}</Text>}
             <View style={styles.optionsRow}>
                 {options.map((opt) => {
@@ -53,9 +54,6 @@ export const StatusPicker = ({ options, value, onChange, color = 'purple', label
 };
 
 const styles = StyleSheet.create({
-    container: {
-        marginBottom: 24,
-    },
     label: {
         color: 'rgba(148, 163, 184, 0.6)',
         fontSize: 10,

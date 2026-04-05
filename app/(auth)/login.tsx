@@ -2,6 +2,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Link, useRouter } from 'expo-router';
 import { Book, Film } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -15,33 +16,42 @@ export default function LoginScreen() {
     const { login } = useAuth();
     const router = useRouter();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
+
+    const getLocalizedError = (msg: string) => {
+        const lowerMsg = msg.toLowerCase();
+        if (lowerMsg.includes('invalid credential') || lowerMsg.includes('wrong password')) return t('errorInvalidCredentials');
+        if (lowerMsg.includes('user not found')) return t('errorUserNotFound');
+        if (lowerMsg.includes('network request failed')) return t('errorNetwork');
+        if (lowerMsg.includes('too many requests')) return t('errorTooManyRequests');
+        return msg;
+    };
 
     const handleLogin = async () => {
         // Prevent multiple clicks
         if (loading) return;
 
         const newErrors: Record<string, string> = {};
-        if (!email.trim()) newErrors.email = 'E-posta adresi zorunludur';
-        if (!password.trim()) newErrors.password = 'Şifre zorunludur';
+        if (!email.trim()) newErrors.email = t('emailRequired');
+        if (!password.trim()) newErrors.password = t('fillRequired');
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            showToast('Lütfen giriş bilgilerini kontrol edin', 'error');
+            showToast(t('checkLoginCredentials'), 'error');
             return;
         }
 
         setLoading(true);
-        // console.log('[Login] Starting login...');
         try {
             await login({ email: email.trim(), password });
-            showToast('Başarıyla giriş yapıldı', 'success');
+            showToast(t('loginSuccess'), 'success');
             router.replace('/(tabs)');
         } catch (e: any) {
             // Sanitize error message to remove technical prefixes like "Error: ..."
-            let msg = e.message || 'Giriş yapılamadı. Bilgilerinizi kontrol edin.';
+            let msg = e.message || t('error');
             msg = msg.replace(/^Error:\s*/i, '').replace(/^\[.*?\]\s*Error:\s*/i, '');
 
-            showToast(msg, 'error');
+            showToast(getLocalizedError(msg), 'error');
         } finally {
             setLoading(false);
         }
@@ -62,13 +72,13 @@ export default function LoginScreen() {
                             <Film size={32} color="#2563eb" />
                         </View>
                     </View>
-                    <Text className="text-white text-3xl font-bold mb-2">Hoş Geldiniz</Text>
-                    <Text className="text-slate-400 text-base">Medya kütüphanenize giriş yapın</Text>
+                    <Text className="text-text-primary text-3xl font-bold mb-2">{t('welcome')}</Text>
+                    <Text className="text-text-secondary text-base">{t('welcomeDesc')}</Text>
                 </View>
 
-                <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
+                <View className="bg-surface border border-border p-6 rounded-3xl">
                     <Input
-                        label="E-posta"
+                        label={t('email')}
                         placeholder="ornek@email.com"
                         value={email}
                         error={errors.email}
@@ -81,7 +91,7 @@ export default function LoginScreen() {
                         editable={!loading}
                     />
                     <Input
-                        label="Şifre"
+                        label={t('password')}
                         placeholder="••••••••"
                         value={password}
                         error={errors.password}
@@ -96,12 +106,12 @@ export default function LoginScreen() {
 
                     <View className="flex-row justify-end -mt-3 mb-6">
                         <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                            <Text className="text-purple-500/80 text-xs font-medium">Şifremi Unuttum</Text>
+                            <Text className="text-purple-500/80 text-xs font-medium">{t('forgotPasswordLink')}</Text>
                         </TouchableOpacity>
                     </View>
 
                     <Button
-                        title="Giriş Yap"
+                        title={t('loginAction')}
                         onPress={handleLogin}
                         loading={loading}
                         disabled={loading}
@@ -109,17 +119,17 @@ export default function LoginScreen() {
                     />
 
                     <View className="flex-row justify-center mt-8">
-                        <Text className="text-slate-500">Hesabınız yok mu? </Text>
+                        <Text className="text-text-secondary">{t('dontHaveAccount')} </Text>
                         <Link href="/(auth)/register" asChild>
                             <TouchableOpacity disabled={loading}>
-                                <Text className="text-purple-500 font-bold">Üye Olun</Text>
+                                <Text className="text-purple-500 font-bold">{t('registerAction')}</Text>
                             </TouchableOpacity>
                         </Link>
                     </View>
                 </View>
 
                 <View className="mt-auto items-center pb-6">
-                    <Text className="text-slate-600 text-xs font-medium tracking-tight">PersonalLib Application Framework</Text>
+                    <Text className="text-text-muted text-xs font-medium tracking-tight">PersonalLib Application Framework</Text>
                 </View>
             </ScrollView>
         </KeyboardAvoidingView>

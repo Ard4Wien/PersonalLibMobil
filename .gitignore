@@ -41,3 +41,10 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Private AI knowledge and summaries
+Proje Özeti Mobil.md
+.env
+.env.local
+
+

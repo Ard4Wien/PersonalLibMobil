@@ -2,20 +2,14 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StatusPicker } from '@/components/ui/StatusPicker';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
-import { MediaStatus } from '@/lib/types';
+import { MediaStatus, UpdateBook } from '@/lib/types';
 import { validateMedia } from '@/lib/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-
-const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
-    { label: 'İstek Listesi', value: 'WISHLIST' },
-    { label: 'Okunuyor', value: 'READING' },
-    { label: 'Okundu', value: 'COMPLETED' },
-    { label: 'Bırakıldı', value: 'DROPPED' },
-];
 
 export default function EditBookModal() {
     const params = useLocalSearchParams();
@@ -23,6 +17,14 @@ export default function EditBookModal() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
+
+    const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
+        { label: t('filterWishlist'), value: 'WISHLIST' },
+        { label: t('filterReading'), value: 'READING' },
+        { label: t('filterRead'), value: 'COMPLETED' },
+        { label: t('filterDropped'), value: 'DROPPED' },
+    ];
 
     const [dataLoaded, setDataLoaded] = useState(false);
 
@@ -44,27 +46,16 @@ export default function EditBookModal() {
 
     useEffect(() => {
         if (books && id && !dataLoaded) {
-            console.log('=== EDIT BOOK DEBUG ===');
-            console.log('Received ID:', id);
-            console.log('Books count:', books?.length);
-            console.log('Book IDs:', books?.map(b => b.id));
-
-            // Flexible ID matching - compare as strings and check alternative fields
             const foundBook = books.find(b => {
                 const itemId = String(b.id || (b as any)._id || '');
                 const paramId = String(id || '');
                 return itemId === paramId;
             });
 
-            console.log('Found book:', foundBook);
-
             if (foundBook) {
-                // Handle nested book data structure
                 const bookData = (foundBook as any).book || foundBook;
                 const userStatus = (foundBook as any).overallStatus || foundBook.status || 'READING';
                 const refId = (foundBook as any).bookId || bookData.id;
-
-                console.log('[EditBook] Using book data:', JSON.stringify(bookData).substring(0, 100));
 
                 setFormData({
                     ...formData,
@@ -82,58 +73,36 @@ export default function EditBookModal() {
 
     const mutation = useMutation({
         mutationFn: async (data: any) => {
-            console.log('[EditBook] Update API broken, falling back to DELETE + CREATE strategy...');
-
-            // 1. Delete existing record
-            try {
-                await api.books.delete(id);
-                console.log('[EditBook] Old record deleted successfully.');
-            } catch (err) {
-                console.error('[EditBook] Delete failed:', err);
-                throw new Error('Eski kayıt silinemedi, işlem iptal edildi.');
-            }
-
-            // 2. Create new record with updated data
-            const createData: any = {
-                title: formData.title,    // API expects 'title'
-                name: formData.title,     // Fallback
-
-                author: formData.author,  // API likely expects 'author'
-                writer: formData.author,  // Fallback
-
+            const updateData: UpdateBook = {
+                id: id,
+                title: formData.title,
+                author: formData.author,
                 coverImage: formData.coverImage,
-                imageUrl: formData.coverImage,
-                image: formData.coverImage,
-
                 genre: formData.genre,
-                category: formData.genre,
-
                 status: formData.status,
+                bookId: (formData as any).bookId,
             };
 
-            return await api.books.create(createData);
+            return await api.books.updateDetails(updateData);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['books'] });
-            showToast('Kitap başarıyla güncellendi', 'success');
+            showToast(t('bookUpdated'), 'success');
             router.back();
         },
-        onError: (e: any) => showToast(e.message || 'Kitap güncellenemedi', 'error'),
+        onError: (e: any) => showToast(e.message || t('bookUpdateError'), 'error'),
     });
-
-    // ... internal implementation ...
 
     const handleSubmit = () => {
         const newErrors = validateMedia(formData, 'book');
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            showToast('Lütfen zorunlu alanları doldurun', 'error');
+            showToast(t('fillRequired'), 'error');
             return;
         }
 
         setErrors({});
-        // Everything else is handled by the mutationFn and api.request
         mutation.mutate({});
     };
 
@@ -141,7 +110,7 @@ export default function EditBookModal() {
         return (
             <View className="flex-1 bg-background items-center justify-center">
                 <ActivityIndicator size="large" color="#a855f7" />
-                <Text className="text-white mt-4">Yükleniyor...</Text>
+                <Text className="text-text-primary mt-4 font-medium">{t('loading')}</Text>
             </View>
         );
     }
@@ -149,17 +118,20 @@ export default function EditBookModal() {
     if (!id) {
         return (
             <View className="flex-1 bg-background items-center justify-center">
-                <Text className="text-red-500">Hata: ID bulunamadı</Text>
+                <Text className="text-red-500">{t('errorIdNotFound')}</Text>
             </View>
         );
     }
 
     return (
-        <ScrollView className="flex-1 bg-background px-6 pt-6">
-            <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl mb-12">
+        <ScrollView
+            className="flex-1 bg-background"
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 40 }}
+        >
+            <View className="bg-background border border-border p-6 rounded-3xl mb-12 shadow-sm">
                 <Input
-                    label="Kitap Adı *"
-                    placeholder="Örn: Suç ve Ceza"
+                    label={t('bookName')}
+                    placeholder={t('placeholderBookName')}
                     value={formData.title}
                     error={errors.title}
                     onChangeText={(text: string) => {
@@ -168,8 +140,8 @@ export default function EditBookModal() {
                     }}
                 />
                 <Input
-                    label="Yazar *"
-                    placeholder="Örn: Dostoyevski"
+                    label={t('author')}
+                    placeholder={t('placeholderAuthor')}
                     value={formData.author}
                     error={errors.author}
                     onChangeText={(text: string) => {
@@ -178,14 +150,14 @@ export default function EditBookModal() {
                     }}
                 />
                 <Input
-                    label="Tür"
-                    placeholder="Örn: Roman, Bilim Kurgu, Tarih"
+                    label={t('genre')}
+                    placeholder={t('placeholderGenreBook')}
                     value={formData.genre}
                     onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
                 />
 
                 <StatusPicker
-                    label="Kütüphane Durumu"
+                    label={t('status')}
                     options={STATUS_OPTIONS}
                     value={formData.status}
                     onChange={(status) => setFormData(p => ({ ...p, status }))}
@@ -193,15 +165,19 @@ export default function EditBookModal() {
                 />
 
                 <Input
-                    label="Kapak Resmi URL"
-                    placeholder="https://..."
+                    label={t('imageUrl')}
+                    placeholder={t('placeholderUrl')}
                     value={formData.coverImage}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, coverImage: text }))}
+                    error={errors.coverImage}
+                    onChangeText={(text: string) => {
+                        setFormData(p => ({ ...p, coverImage: text }));
+                        if (errors.coverImage) setErrors(p => ({ ...p, coverImage: '' }));
+                    }}
                 />
 
 
                 <Button
-                    title="Değişiklikleri Kaydet"
+                    title={t('saveChanges')}
                     onPress={handleSubmit}
                     loading={mutation.isPending}
                     className="mt-4"

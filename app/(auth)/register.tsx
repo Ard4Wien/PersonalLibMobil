@@ -2,6 +2,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Link, useRouter } from 'expo-router';
 import { Book, Film } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -16,30 +17,41 @@ export default function RegisterScreen() {
         passwordConfirm: ''
     });
     const [loading, setLoading] = useState(false);
+    const [showPasswords, setShowPasswords] = useState(false);
     const { register } = useAuth();
     const router = useRouter();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
+
+    const getLocalizedError = (msg: string) => {
+        const lowerMsg = msg.toLowerCase();
+        if (lowerMsg.includes('email already in use') || lowerMsg.includes('email already exists')) return t('errorEmailInUse');
+        if (lowerMsg.includes('weak password')) return t('errorWeakPassword');
+        if (lowerMsg.includes('invalid email')) return t('errorInvalidEmail');
+        if (lowerMsg.includes('network request failed')) return t('errorNetwork');
+        return msg;
+    };
 
     const handleRegister = async () => {
         const { username, displayName, email, password, passwordConfirm } = formData;
 
         if (!username || !displayName || !email || !password) {
-            showToast('Lütfen tüm alanları doldurun', 'error');
+            showToast(t('fillRequired'), 'error');
             return;
         }
 
         if (password !== passwordConfirm) {
-            showToast('Şifreler uyuşmuyor', 'error');
+            showToast(t('passwordsDoNotMatch'), 'error');
             return;
         }
 
         setLoading(true);
         try {
             await register({ username, displayName, email, password });
-            showToast('Kayıt başarıyla oluşturuldu', 'success');
+            showToast(t('registerSuccess'), 'success');
             router.replace('/(tabs)');
         } catch (e: any) {
-            showToast(e.message || 'Kayıt yapılamadı', 'error');
+            showToast(getLocalizedError(e.message || t('registerError')), 'error');
         } finally {
             setLoading(false);
         }
@@ -60,26 +72,26 @@ export default function RegisterScreen() {
                             <Film size={32} color="#2563eb" />
                         </View>
                     </View>
-                    <Text className="text-white text-3xl font-bold mb-2">Yeni Hesap Oluştur</Text>
-                    <Text className="text-text-secondary text-base">Medya kütüphanenizi oluşturmaya başlayın</Text>
+                    <Text className="text-text-primary text-3xl font-bold mb-2 text-center">{t('createAccount')}</Text>
+                    <Text className="text-text-secondary text-base text-center px-4">{t('createAccountDesc')}</Text>
                 </View>
 
-                <View className="bg-surface border border-slate-800 p-6 rounded-2xl mb-10">
+                <View className="bg-surface border border-border p-6 rounded-2xl mb-10">
                     <Input
-                        label="Kullanıcı Adı"
+                        label={t('username')}
                         placeholder="kullanici_adi"
                         value={formData.username}
                         onChangeText={(text: string) => setFormData(prev => ({ ...prev, username: text }))}
                         autoCapitalize="none"
                     />
                     <Input
-                        label="Görünen Ad"
-                        placeholder="Adınız"
+                        label={t('displayName')}
+                        placeholder={t('displayName')}
                         value={formData.displayName}
                         onChangeText={(text: string) => setFormData(prev => ({ ...prev, displayName: text }))}
                     />
                     <Input
-                        label="E-posta"
+                        label={t('email')}
                         placeholder="ornek@email.com"
                         value={formData.email}
                         onChangeText={(text: string) => setFormData(prev => ({ ...prev, email: text }))}
@@ -87,34 +99,38 @@ export default function RegisterScreen() {
                         autoCapitalize="none"
                     />
                     <Input
-                        label="Şifre"
+                        label={t('password')}
                         placeholder="••••••••"
                         value={formData.password}
                         onChangeText={(text: string) => setFormData(prev => ({ ...prev, password: text }))}
                         secureTextEntry
                         autoCapitalize="none"
+                        isPasswordVisible={showPasswords}
+                        onTogglePassword={() => setShowPasswords(!showPasswords)}
                     />
                     <Input
-                        label="Şifre Tekrar"
+                        label={t('passwordConfirm')}
                         placeholder="••••••••"
                         value={formData.passwordConfirm}
                         onChangeText={(text: string) => setFormData(prev => ({ ...prev, passwordConfirm: text }))}
                         secureTextEntry
                         autoCapitalize="none"
+                        isPasswordVisible={showPasswords}
+                        onTogglePassword={() => setShowPasswords(!showPasswords)}
                     />
 
                     <Button
-                        title="Üye Ol"
+                        title={t('registerAction')}
                         onPress={handleRegister}
                         loading={loading}
                         className="mt-4"
                     />
 
                     <View className="flex-row justify-center mt-6">
-                        <Text className="text-text-muted">Zaten hesabınız var mı? </Text>
+                        <Text className="text-text-muted">{t('alreadyHaveAccount')} </Text>
                         <Link href="/(auth)/login" asChild>
                             <TouchableOpacity>
-                                <Text className="text-purple-500 font-bold">Giriş Yap</Text>
+                                <Text className="text-purple-500 font-bold">{t('loginAction')}</Text>
                             </TouchableOpacity>
                         </Link>
                     </View>

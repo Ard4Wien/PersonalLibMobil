@@ -2,37 +2,58 @@ import { Eye, EyeOff } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-export const Input = ({ label, error, secureTextEntry, ...props }: any) => {
-    const [isVisible, setIsVisible] = useState(false);
+interface InputProps extends React.ComponentProps<typeof TextInput> {
+    label?: string;
+    error?: string;
+    rightIcon?: React.ReactNode;
+    rightElement?: React.ReactNode;
+    containerStyle?: string;
+    isPasswordVisible?: boolean;
+    onTogglePassword?: () => void;
+}
+
+export const Input = ({ label, error, secureTextEntry, rightIcon, rightElement, containerStyle, isPasswordVisible, onTogglePassword, ...props }: InputProps) => {
+    const [internalIsVisible, setInternalIsVisible] = useState(false);
+
+    const isVisible = isPasswordVisible !== undefined ? isPasswordVisible : internalIsVisible;
+    const toggleVisibility = onTogglePassword || (() => setInternalIsVisible(!internalIsVisible));
+
     const isPassword = !!secureTextEntry;
 
     return (
-        <View className="mb-5">
+        <View className={`mb-5 ${containerStyle || ''}`}>
             {label && (
                 <Text className={`mb-1.5 text-xs font-bold uppercase tracking-widest opacity-60 ${error ? 'text-red-400' : 'text-text-secondary'}`}>
                     {label}
                 </Text>
             )}
-            <View className="relative justify-center">
+            <View className={`flex-row items-center bg-surface-light border rounded-xl px-4 ${error ? 'border-red-500/50 bg-red-500/5' : 'border-border'
+                } focus:border-purple-500/50`}>
                 <TextInput
                     {...props}
                     secureTextEntry={isPassword ? !isVisible : false}
-                    placeholderTextColor="#475569"
-                    className={`bg-slate-900 border text-white rounded-xl px-4 py-3.5 text-base ${error ? 'border-red-500/50 bg-red-500/5' : 'border-slate-800'
-                        } focus:border-purple-500/50 ${isPassword ? 'pr-12' : ''}`}
+                    placeholderTextColor="#94a3b8"
+                    className="flex-1 text-text-primary py-3.5 text-base"
+                    style={{ letterSpacing: 0 }}
                 />
-                {isPassword && (
-                    <TouchableOpacity
-                        onPress={() => setIsVisible(!isVisible)}
-                        className="absolute right-3 p-2"
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        {isVisible ? (
-                            <EyeOff size={20} color="#94a3b8" />
+
+                {(isPassword || rightIcon || rightElement) && (
+                    <View className="items-center justify-center pl-2">
+                        {isPassword ? (
+                            <TouchableOpacity
+                                onPress={toggleVisibility}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                {isVisible ? (
+                                    <EyeOff size={20} color="#94a3b8" />
+                                ) : (
+                                    <Eye size={20} color="#94a3b8" />
+                                )}
+                            </TouchableOpacity>
                         ) : (
-                            <Eye size={20} color="#94a3b8" />
+                            rightIcon || rightElement
                         )}
-                    </TouchableOpacity>
+                    </View>
                 )}
             </View>
             {error && (

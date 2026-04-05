@@ -6,10 +6,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#000000',
-        surface: 'rgba(30, 30, 40, 0.8)',
-        'surface-light': 'rgba(50, 50, 60, 0.6)',
-        primary: { 
+        background: 'var(--background)',
+        surface: 'var(--surface)',
+        'surface-light': 'var(--surface-light)',
+        primary: {
           from: '#9333ea', // purple-600
           to: '#db2777'    // pink-600
         },
@@ -18,10 +18,11 @@ module.exports = {
           pink: '#ec4899'
         },
         text: {
-          primary: '#ffffff',
-          secondary: '#94a3b8',
-          muted: '#64748b'
-        }
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          muted: 'var(--text-muted)'
+        },
+        border: 'var(--border)'
       }
     },
   },

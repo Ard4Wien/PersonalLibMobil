@@ -6,6 +6,7 @@ export interface User {
     username: string;
     displayName: string;
     avatarUrl?: string;
+    isPrivate?: boolean;
 }
 
 export interface Book {
@@ -19,6 +20,7 @@ export interface Book {
     genre?: string;
     status: MediaStatus;
     rating?: number;
+    isFavorite?: boolean;
     // Fallbacks for backend compatibility
     name?: string;
     baslik?: string;
@@ -43,6 +45,7 @@ export interface Movie {
     genre?: string;
     status: MediaStatus;
     rating?: number;
+    isFavorite?: boolean;
     // Fallbacks for backend compatibility
     name?: string;
     baslik?: string;
@@ -66,8 +69,11 @@ export interface Series {
     startYear?: number;
     endYear?: number;
     genre?: string;
+    lastSeason?: number;
+    lastEpisode?: number;
     status: MediaStatus;
     rating?: number;
+    isFavorite?: boolean;
     // Fallbacks for backend compatibility
     name?: string;
     baslik?: string;
@@ -84,10 +90,10 @@ export interface Series {
 }
 
 export type CreateBook = Omit<Book, 'id'>;
-export type UpdateBook = Partial<CreateBook> & { id: string };
+export type UpdateBook = Partial<CreateBook> & { id: string; bookId?: string };
 
 export type CreateMovie = Omit<Movie, 'id'>;
-export type UpdateMovie = Partial<CreateMovie> & { id: string };
+export type UpdateMovie = Partial<CreateMovie> & { id: string; movieId?: string };
 
 export type CreateSeries = Omit<Series, 'id'>;
-export type UpdateSeries = Partial<CreateSeries> & { id: string };
+export type UpdateSeries = Partial<CreateSeries> & { id: string; seriesId?: string };

@@ -2,20 +2,15 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StatusPicker } from '@/components/ui/StatusPicker';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
-import { MediaStatus } from '@/lib/types';
+import { MediaStatus, UpdateSeries } from '@/lib/types';
 import { validateMedia } from '@/lib/validation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ChevronUp } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
-
-const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
-    { label: 'İstek Listesi', value: 'WISHLIST' },
-    { label: 'İzleniyor', value: 'WATCHING' },
-    { label: 'Tamamlandı', value: 'COMPLETED' },
-    { label: 'Bırakıldı', value: 'DROPPED' },
-];
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 export default function EditSeriesModal() {
     const params = useLocalSearchParams();
@@ -23,8 +18,15 @@ export default function EditSeriesModal() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
 
-    // State for tracking if data was loaded
+    const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
+        { label: t('filterWishlist'), value: 'WISHLIST' },
+        { label: t('statusWatching'), value: 'WATCHING' },
+        { label: t('statusCompleted'), value: 'COMPLETED' },
+        { label: t('filterDropped'), value: 'DROPPED' },
+    ];
+
     const [dataLoaded, setDataLoaded] = useState(false);
 
     const { data: seriesList, isLoading } = useQuery({
@@ -40,42 +42,26 @@ export default function EditSeriesModal() {
         genre: '',
         status: 'WATCHING' as MediaStatus,
         totalSeasons: '',
+        lastSeason: '',
+        lastEpisode: '',
         startYear: '',
         endYear: '',
+        seriesId: '',
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    // Find the series when data is available
     useEffect(() => {
         if (seriesList && id && !dataLoaded) {
-            console.log('=== EDIT SERIES DEBUG ===');
-            console.log('Received ID:', id);
-            console.log('Series list:', JSON.stringify(seriesList, null, 2));
-
-            // Try multiple matching strategies
-            let foundSeries = seriesList.find(s => s.id === id);
-
-            if (!foundSeries) {
-                foundSeries = seriesList.find(s => String(s.id) === String(id));
-            }
-
-            if (!foundSeries) {
-                foundSeries = seriesList.find(s => (s as any)._id === id);
-            }
-
-            console.log('Found series:', foundSeries);
+            let foundSeries = seriesList.find(s => String(s.id) === String(id)) ||
+                seriesList.find(s => (s as any)._id === id);
 
             if (foundSeries) {
-                // Handle nested series data structure (UserSeries vs Series)
-                const seriesData = foundSeries.series || foundSeries;
-                const userStatus = foundSeries.overallStatus || foundSeries.status || 'WATCHING';
-                const refId = (foundSeries as any).seriesId || seriesData.id;
-
-                console.log('[EditSeries] Using series data:', JSON.stringify(seriesData).substring(0, 100));
+                const seriesData = (foundSeries as any).series || foundSeries;
+                const userStatus = (foundSeries as any).overallStatus || (foundSeries as any).status || 'WATCHING';
+                const refId = (foundSeries as any).seriesId || seriesData.id || (seriesData as any)._id;
 
                 setFormData({
-                    ...formData,
                     title: seriesData.title || (seriesData as any).name || '',
                     creator: seriesData.creator || (seriesData as any).yapimci || (seriesData as any).creatorName || '',
                     coverImage: seriesData.coverImage || (seriesData as any).image || (seriesData as any).imageUrl || '',
@@ -83,73 +69,69 @@ export default function EditSeriesModal() {
                     genre: seriesData.genre || (seriesData as any).category || '',
                     status: userStatus as MediaStatus,
                     totalSeasons: seriesData.totalSeasons?.toString() || '',
-                    // startYear and endYear previously removed from UI, but maybe keep in state if backend expects
+                    lastSeason: (foundSeries as any).lastSeason?.toString() || '',
+                    lastEpisode: (foundSeries as any).lastEpisode?.toString() || '',
                     startYear: seriesData.startYear?.toString() || '',
                     endYear: seriesData.endYear?.toString() || '',
-                    seriesId: refId
-                } as any);
+                    seriesId: refId || ''
+                });
                 setDataLoaded(true);
-                console.log('Form data set successfully!');
-            } else {
-                console.log('Series NOT FOUND with id:', id);
             }
         }
     }, [seriesList, id, dataLoaded]);
 
     const mutation = useMutation({
-        mutationFn: async (data: any) => {
-            console.log('[EditSeries] Update API broken, falling back to DELETE + CREATE strategy...');
+        mutationFn: async () => {
+            if (!formData.seriesId) {
+                throw new Error('Series ID eksik.');
+            }
 
-            // 1. Delete existing record
-            await api.series.delete(id);
-
-            // 2. Create new record
-            const createData: any = {
+            const updateData: UpdateSeries = {
+                id: id,
+                seriesId: formData.seriesId,
                 title: formData.title,
-                name: formData.title,
-
                 creator: formData.creator,
-                creatorName: formData.creator,
-
                 coverImage: formData.coverImage,
-                imageUrl: formData.coverImage,
-                image: formData.coverImage,
-
                 genre: formData.genre,
-                category: formData.genre,
-
                 status: formData.status,
                 totalSeasons: formData.totalSeasons ? parseInt(formData.totalSeasons) : undefined,
+                lastSeason: formData.lastSeason ? parseInt(formData.lastSeason) : undefined,
+                lastEpisode: formData.lastEpisode ? parseInt(formData.lastEpisode) : undefined,
             };
-            return await api.series.create(createData);
+
+            return await api.series.updateDetails(updateData);
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['series'] });
-            showToast('Dizi başarıyla güncellendi', 'success');
+            showToast(t('seriesUpdated'), 'success');
             router.back();
         },
-        onError: (e: any) => showToast(e.message || 'Dizi güncellenemedi', 'error'),
+        onError: (e: any) => showToast(e.message || t('seriesUpdateError'), 'error'),
     });
+
+    const handleIncrement = (field: 'lastSeason' | 'lastEpisode') => {
+        const current = parseInt(formData[field]) || 0;
+        setFormData(p => ({ ...p, [field]: (current + 1).toString() }));
+    };
 
     const handleSubmit = () => {
         const newErrors = validateMedia(formData, 'series');
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            showToast('Lütfen zorunlu alanları doldurun', 'error');
+            showToast(t('fillRequired'), 'error');
             return;
         }
 
         setErrors({});
-        // Numeric conversions should still be explicit if passed in a blank object (though here mutate({}) relies on closure)
-        mutation.mutate({});
+        mutation.mutate();
     };
 
     if (isLoading) {
         return (
             <View className="flex-1 bg-background items-center justify-center">
                 <ActivityIndicator size="large" color="#a855f7" />
-                <Text className="text-white mt-4">Yükleniyor...</Text>
+                <Text className="text-text-primary mt-4 font-medium">{t('loading')}</Text>
             </View>
         );
     }
@@ -157,17 +139,20 @@ export default function EditSeriesModal() {
     if (!id) {
         return (
             <View className="flex-1 bg-background items-center justify-center">
-                <Text className="text-red-500">Hata: ID bulunamadı</Text>
+                <Text className="text-red-500 font-bold">{t('errorIdNotFound')}</Text>
             </View>
         );
     }
 
     return (
-        <ScrollView className="flex-1 bg-background px-6 pt-6">
-            <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl mb-12">
+        <ScrollView
+            className="flex-1 bg-background"
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingBottom: 40 }}
+        >
+            <View className="bg-background border border-border p-6 rounded-3xl mb-12 shadow-sm">
                 <Input
-                    label="Dizi Adı *"
-                    placeholder="Örn: Breaking Bad"
+                    label={t('seriesName')}
+                    placeholder={t('placeholderSeriesName')}
                     value={formData.title}
                     error={errors.title}
                     onChangeText={(text: string) => {
@@ -176,44 +161,88 @@ export default function EditSeriesModal() {
                     }}
                 />
                 <Input
-                    label="Yapımcı/Yaratıcı"
-                    placeholder="Örn: Vince Gilligan"
+                    label={t('creator')}
+                    placeholder={t('placeholderCreator')}
                     value={formData.creator}
                     onChangeText={(text: string) => setFormData(p => ({ ...p, creator: text }))}
                 />
-                <Input
-                    label="Toplam Sezon"
-                    placeholder="Örn: 5"
-                    value={formData.totalSeasons}
-                    keyboardType="numeric"
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, totalSeasons: text }))}
-                />
 
-                <Input
-                    label="Tür"
-                    placeholder="Örn: Dram, Suç"
-                    value={formData.genre}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
-                />
+                <View className="flex-row space-x-3">
+                    <Input
+                        label={t('totalSeasons')}
+                        placeholder="0"
+                        value={formData.totalSeasons}
+                        keyboardType="numeric"
+                        containerStyle="flex-1"
+                        onChangeText={(text: string) => setFormData(p => ({ ...p, totalSeasons: text }))}
+                    />
+                    <Input
+                        label={t('genre')}
+                        placeholder={t('placeholderGenreSeries')}
+                        value={formData.genre}
+                        containerStyle="flex-1"
+                        onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
+                    />
+                </View>
 
                 <StatusPicker
-                    label="İzleme Durumu"
+                    label={t('status')}
                     options={STATUS_OPTIONS}
                     value={formData.status}
                     onChange={(status) => setFormData(p => ({ ...p, status }))}
-                    color="blue"
+                    color="cyan"
                 />
+
+                {formData.status === 'WATCHING' && (
+                    <View className="flex-row space-x-3 mt-2">
+                        <Input
+                            label={t('lastSeason')}
+                            placeholder="0"
+                            value={formData.lastSeason}
+                            keyboardType="numeric"
+                            containerStyle="flex-1"
+                            onChangeText={(text: string) => setFormData(p => ({ ...p, lastSeason: text }))}
+                            rightElement={
+                                <TouchableOpacity
+                                    onPress={() => handleIncrement('lastSeason')}
+                                    className="bg-surface-light p-2 rounded-lg active:bg-slate-400/20"
+                                >
+                                    <ChevronUp size={16} color="#06b6d4" />
+                                </TouchableOpacity>
+                            }
+                        />
+                        <Input
+                            label={t('lastEpisode')}
+                            placeholder="0"
+                            value={formData.lastEpisode}
+                            keyboardType="numeric"
+                            containerStyle="flex-1"
+                            onChangeText={(text: string) => setFormData(p => ({ ...p, lastEpisode: text }))}
+                            rightElement={
+                                <TouchableOpacity
+                                    onPress={() => handleIncrement('lastEpisode')}
+                                    className="bg-surface-light p-2 rounded-lg active:bg-slate-400/20"
+                                >
+                                    <ChevronUp size={16} color="#06b6d4" />
+                                </TouchableOpacity>
+                            }
+                        />
+                    </View>
+                )}
 
                 <Input
-                    label="Kapak Resmi URL"
-                    placeholder="https://..."
+                    label={t('imageUrl')}
+                    placeholder={t('placeholderUrl')}
                     value={formData.coverImage}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, coverImage: text }))}
+                    error={errors.coverImage}
+                    onChangeText={(text: string) => {
+                        setFormData(p => ({ ...p, coverImage: text }));
+                        if (errors.coverImage) setErrors(p => ({ ...p, coverImage: '' }));
+                    }}
                 />
 
-
                 <Button
-                    title="Değişiklikleri Kaydet"
+                    title={t('saveChanges')}
                     onPress={handleSubmit}
                     loading={mutation.isPending}
                     className="mt-4"

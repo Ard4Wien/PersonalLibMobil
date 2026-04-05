@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Mail, Send } from 'lucide-react-native';
@@ -14,10 +15,11 @@ export default function ForgotPasswordScreen() {
     const [error, setError] = useState('');
     const router = useRouter();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
 
     const handleRequestReset = async () => {
         if (!email.trim()) {
-            setError('E-posta adresi zorunludur');
+            setError(t('emailRequired'));
             return;
         }
 
@@ -28,7 +30,7 @@ export default function ForgotPasswordScreen() {
             await api.auth.forgotPassword(email.trim());
             setIsSubmitted(true);
         } catch (e: any) {
-            showToast(e.message || 'Bir hata oluştu', 'error');
+            showToast(e.message || t('error'), 'error');
         } finally {
             setLoading(false);
         }
@@ -52,13 +54,13 @@ export default function ForgotPasswordScreen() {
                         <View className="bg-green-500/20 p-6 rounded-full border border-green-500/30 mb-6">
                             <Send size={48} color="#22c55e" />
                         </View>
-                        <Text className="text-white text-3xl font-bold mb-4">Başarıyla Gönderildi</Text>
+                        <Text className="text-white text-3xl font-bold mb-4">{t('resetLinkSent')}</Text>
                         <Text className="text-slate-400 text-center text-lg mb-8 px-6">
-                            Sıfırlama bağlantısı e-posta adresinize gönderilmiştir. Lütfen <Text className="text-white font-bold">spam/gereksiz</Text> kutusunu da kontrol etmeyi unutmayın.
+                            {t('resetLinkSentDesc')}
                         </Text>
 
                         <Button
-                            title="Giriş Ekranına Dön"
+                            title={t('backToLogin')}
                             onPress={() => router.replace('/(auth)/login')}
                             className="w-full"
                         />
@@ -69,15 +71,15 @@ export default function ForgotPasswordScreen() {
                             <View className="bg-purple-600/20 p-4 rounded-3xl border border-purple-500/30 mb-4">
                                 <Mail size={40} color="#9333ea" />
                             </View>
-                            <Text className="text-white text-3xl font-bold mb-2">Şifremi Unuttum</Text>
+                            <Text className="text-white text-3xl font-bold mb-2">{t('forgotPasswordTitle')}</Text>
                             <Text className="text-slate-400 text-center text-base px-10">
-                                E-posta adresinizi girin, size şifrenizi sıfırlamanız için bir bağlantı göndereceğiz.
+                                {t('forgotPasswordDesc')}
                             </Text>
                         </View>
 
                         <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                             <Input
-                                label="E-posta Adresi"
+                                label={t('email')}
                                 placeholder="ornek@email.com"
                                 value={email}
                                 error={error}
@@ -91,7 +93,7 @@ export default function ForgotPasswordScreen() {
                             />
 
                             <Button
-                                title="Bağlantı Gönder"
+                                title={t('sendResetLink')}
                                 onPress={handleRequestReset}
                                 loading={loading}
                                 icon={<Send size={18} color="white" />}

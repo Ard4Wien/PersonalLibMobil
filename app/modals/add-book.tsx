@@ -1,27 +1,29 @@
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { SearchField } from '@/components/ui/SearchField';
 import { StatusPicker } from '@/components/ui/StatusPicker';
 import { useToast } from '@/components/ui/Toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { api } from '@/lib/api';
 import { MediaStatus } from '@/lib/types';
 import { validateMedia } from '@/lib/validation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Search } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-
-const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
-    { label: 'İstek Listesi', value: 'WISHLIST' },
-    { label: 'Okunuyor', value: 'READING' },
-    { label: 'Okundu', value: 'COMPLETED' },
-    { label: 'Bırakıldı', value: 'DROPPED' },
-];
+import React, { useState } from 'react';
+import { ScrollView, View } from 'react-native';
 
 export default function AddBookModal() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const { show: showToast } = useToast();
+    const { t } = useLanguage();
+
+    const STATUS_OPTIONS: { label: string; value: MediaStatus }[] = [
+        { label: t('filterWishlist'), value: 'WISHLIST' },
+        { label: t('filterReading'), value: 'READING' },
+        { label: t('filterRead'), value: 'COMPLETED' },
+        { label: t('filterDropped'), value: 'DROPPED' },
+    ];
 
     const [formData, setFormData] = useState({
         title: '',
@@ -32,60 +34,27 @@ export default function AddBookModal() {
         status: 'WISHLIST' as MediaStatus,
     });
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<any[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const mutation = useMutation({
         mutationFn: api.books.create,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['books'] });
-            showToast('Kitap başarıyla eklendi', 'success');
+            showToast(t('bookAdded'), 'success');
             router.back();
         },
-        onError: (e: any) => showToast(e.message || 'Kitap eklenemedi', 'error'),
+        onError: (e: any) => showToast(e.message || t('bookError'), 'error'),
     });
-
-    // ... internal implementation ...
-
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (searchQuery.length > 2) {
-                handleSearch();
-            } else {
-                setSearchResults([]);
-            }
-        }, 500);
-
-        return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery]);
-
-    const handleSearch = async () => {
-        setIsSearching(true);
-        try {
-            const results = await api.search.books(searchQuery);
-            // Filter out results without cover image as requested
-            setSearchResults(results.filter(b => b.coverImage || (b as any).imageUrl || (b as any).image));
-        } catch (err) {
-            console.error('Search error:', err);
-        } finally {
-            setIsSearching(false);
-        }
-    };
 
     const selectResult = (item: any) => {
         setFormData({
             title: item.title || item.name || '',
             author: item.author || item.writer || '',
-            coverImage: item.coverImage || item.imageUrl || item.image || '',
+            coverImage: item.coverImage || item.imageUrl || item.image || item.cover_image || item.image_url || '',
             description: item.description || item.summary || '',
             genre: item.genre || item.category || '',
             status: 'WISHLIST',
         });
-        setSearchResults([]);
-        setSearchQuery('');
     };
 
     const handleSubmit = () => {
@@ -93,103 +62,82 @@ export default function AddBookModal() {
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
-            showToast('Lütfen zorunlu alanları doldurun', 'error');
+            showToast(t('fillRequired'), 'error');
             return;
         }
 
         setErrors({});
-        // Payload preparation is now handled centrally in api.ts
         mutation.mutate(formData as any);
     };
 
     return (
-        <ScrollView className="flex-1 bg-background px-6 pt-6">
-            <View className="mb-6">
-                <View className="relative">
+        <View className="flex-1 bg-background pt-28">
+            <View className="px-6 z-50">
+                <SearchField
+                    placeholder={t('searchPlaceholderBook')}
+                    onSelect={selectResult}
+                    searchFn={api.search.books}
+                    getSubtitle={(item) => item.author || item.writer || t('noAuthor')}
+                    iconColor="#10b981"
+                />
+            </View>
+
+            <ScrollView className="flex-1 px-6 pt-2 mb-12" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+                <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl">
                     <Input
-                        placeholder="Hızlıca ara ve ekle..."
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        className="pr-12"
+                        label={t('bookName')}
+                        placeholder={t('placeholderBookName')}
+                        value={formData.title}
+                        error={errors.title}
+                        onChangeText={(text: string) => {
+                            setFormData(p => ({ ...p, title: text }));
+                            if (errors.title) setErrors(p => ({ ...p, title: '' }));
+                        }}
                     />
-                    <View className="absolute right-4 top-1/2 -mt-2">
-                        {isSearching ? <ActivityIndicator size="small" color="#9333ea" /> : <Search size={20} color="#64748b" />}
-                    </View>
+                    <Input
+                        label={t('author')}
+                        placeholder={t('placeholderAuthor')}
+                        value={formData.author}
+                        error={errors.author}
+                        onChangeText={(text: string) => {
+                            setFormData(p => ({ ...p, author: text }));
+                            if (errors.author) setErrors(p => ({ ...p, author: '' }));
+                        }}
+                    />
+
+                    <Input
+                        label={t('genre')}
+                        placeholder={t('placeholderGenreBook')}
+                        value={formData.genre}
+                        onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
+                    />
+                    <StatusPicker
+                        label={t('status')}
+                        options={STATUS_OPTIONS}
+                        value={formData.status}
+                        onChange={(status) => setFormData(p => ({ ...p, status }))}
+                        color="purple"
+                    />
+
+                    <Input
+                        label={t('imageUrl')}
+                        placeholder={t('placeholderUrl')}
+                        value={formData.coverImage}
+                        error={errors.coverImage}
+                        onChangeText={(text: string) => {
+                            setFormData(p => ({ ...p, coverImage: text }));
+                            if (errors.coverImage) setErrors(p => ({ ...p, coverImage: '' }));
+                        }}
+                    />
+
+                    <Button
+                        title={t('save')}
+                        onPress={handleSubmit}
+                        loading={mutation.isPending}
+                        className="mt-4"
+                    />
                 </View>
-
-                {searchResults.length > 0 && (
-                    <View className="bg-slate-900 border border-slate-800 rounded-2xl mt-2 overflow-hidden shadow-2xl">
-                        {searchResults.slice(0, 5).map((item, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                onPress={() => selectResult(item)}
-                                className="flex-row items-center p-3 border-b border-slate-800 active:bg-slate-800"
-                            >
-                                <Image
-                                    source={{ uri: api.utils.optimizeImage(item.coverImage || item.imageUrl || item.image) }}
-                                    className="w-10 h-14 rounded-md bg-slate-800"
-                                />
-                                <View className="ml-3 flex-1">
-                                    <Text className="text-white font-bold text-sm" numberOfLines={1}>{item.title || item.name}</Text>
-                                    <Text className="text-slate-400 text-xs" numberOfLines={1}>{item.author || item.writer}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
-            </View>
-
-            <View className="bg-slate-900/50 border border-slate-800 p-6 rounded-3xl mb-12">
-                <Input
-                    label="Kitap Adı *"
-                    placeholder="Örn: Suç ve Ceza"
-                    value={formData.title}
-                    error={errors.title}
-                    onChangeText={(text: string) => {
-                        setFormData(p => ({ ...p, title: text }));
-                        if (errors.title) setErrors(p => ({ ...p, title: '' }));
-                    }}
-                />
-                <Input
-                    label="Yazar *"
-                    placeholder="Örn: Dostoyevski"
-                    value={formData.author}
-                    error={errors.author}
-                    onChangeText={(text: string) => {
-                        setFormData(p => ({ ...p, author: text }));
-                        if (errors.author) setErrors(p => ({ ...p, author: '' }));
-                    }}
-                />
-                <Input
-                    label="Tür"
-                    placeholder="Örn: Roman, Bilim Kurgu, Tarih"
-                    value={formData.genre}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, genre: text }))}
-                />
-
-                <StatusPicker
-                    label="Kütüphane Durumu"
-                    options={STATUS_OPTIONS}
-                    value={formData.status}
-                    onChange={(status) => setFormData(p => ({ ...p, status }))}
-                    color="purple"
-                />
-
-                <Input
-                    label="Kapak Resmi URL"
-                    placeholder="https://..."
-                    value={formData.coverImage}
-                    onChangeText={(text: string) => setFormData(p => ({ ...p, coverImage: text }))}
-                />
-
-
-                <Button
-                    title="Kitabı Kaydet"
-                    onPress={handleSubmit}
-                    loading={mutation.isPending}
-                    className="mt-4"
-                />
-            </View>
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 }
