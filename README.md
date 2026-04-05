@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/images/icon.png" width="120" alt="PersonalLib Logo" />
+  <img src="assets/images/github-hero.png" width="120" alt="PersonalLib Logo" />
 </p>
 
 <h1 align="center">PersonalLib-Mobil</h1>
