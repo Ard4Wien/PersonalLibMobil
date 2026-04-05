@@ -30,8 +30,6 @@
 
 ## 🛠 Teknoloji Yığını (Tech Stack)
 
-Uygulamanın kalbinde modern ve performans odaklı kütüphaneler yer alıyor:
-
 *   **Çekirdek:** [Expo](https://expo.dev/) & [React Native](https://reactnative.dev/) (SDK 54)
 *   **Navigasyon:** [Expo Router](https://docs.expo.dev/router/introduction/) (Type-safe, file-based routing)
 *   **Stil Yönetimi:** [NativeWind](https://www.nativewind.dev/) (Tailwind CSS v4)
