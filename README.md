@@ -16,6 +16,12 @@
 
 ---
 
+## Önemli Not!
+ .apk Dosyasını indirirken **Google Play Store** sizi uyaracaktır. Bu durum tamamiyle uygulamanın lisanssız olmasından kaynaklıdır. Gönül rahatlığı ile kurabilirisiniz.
+
+---
+
+
 **PersonalLib-Mobil**, dijital kütüphanesini her an yanında taşımak isteyenler için geliştirdiğim, modern ve kullanıcı dostu bir mobil uygulama. Sadece bir kayıt listesi olmanın ötesinde, koleksiyonlarınızı platformlar arası senkronize eden ve başkalarıyla paylaşmanıza olanak tanıyan bir dijital portfolyo görevi görüyor.
 
 ## Neler Var?
